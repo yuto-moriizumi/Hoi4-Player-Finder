@@ -1,0 +1,25 @@
+﻿service: hoi4-player-finder
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: ap-northeast-1
+
+functions:
+  app:
+    # sls deploy でデプロイ後、Lambdaのhandler設定が「main.myhandler」になっていなかったら直す
+    handler: handler.myhandler
+    events:
+      - http:
+          method: ANY
+          path: '/'
+      - http:
+          method: ANY
+          path: '{proxy+}'
+
+# webpackでコードをまとめ、トランスコンパイルする
+plugins:
+  - serverless-webpack
+
+custom:
+  webpackIncludeModules: true # enable auto-packing of external modules

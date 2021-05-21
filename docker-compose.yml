@@ -1,0 +1,51 @@
+version: "3"
+services:
+  api:
+    image: node:14.15.4-buster-slim
+    hostname: api-container
+    volumes:
+      - ./api/:/usr/src/
+      - api_modules:/usr/src/node_modules #node_modulesはコンテナ内部で用意します
+    working_dir: "/usr/src"
+    ports:
+      - "3000:3000"
+    environment:
+      RDS_HOSTNAME: $RDS_HOSTNAME
+      RDS_USERNAME: $RDS_USERNAME
+      RDS_PASSWORD: $RDS_PASSWORD
+      RDS_DB_NAME: "hoi4-player-finder"
+      TWITTER_ACCESS_TOKEN: $TWITTER_ACCESS_TOKEN
+      TWITTER_ACCESS_TOKEN_SECRET: $TWITTER_ACCESS_TOKEN_SECRET
+      TWITTER_BEARER_TOKEN: $TWITTER_BEARER_TOKEN
+      TWITTER_CONSUMER_KEY: $TWITTER_CONSUMER_KEY
+      TWITTER_CONSUMER_SECRET: $TWITTER_CONSUMER_SECRET
+      TWITTER_SCREEN_NAME: $TWITTER_SCREEN_NAME
+    command: sh -c "yarn install && yarn dev"
+    depends_on:
+      - db
+  db:
+    image: mysql:8
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: docker
+      TZ: "Asia/Tokyo"
+    volumes:
+      - ./db/data:/var/lib/mysql #データ永続化
+      - ./db/sql:/docker-entrypoint-initdb.d #起動時sqlフォルダ内のsqlファイルを実行
+  # compose up しないとphpmyadminに入れない(理由不明)
+  phpmyadmin:
+    image: phpmyadmin #fpmやalpineタグは別途httpサーバが必要
+    environment:
+      - PMA_ARBITRARY=1
+      # - PMA_HOST=db
+      # - PMA_USER=root
+      # - PMA_PASSWORD=docker
+    ports:
+      - 8080:80
+    volumes:
+      - "./phpmyadmin:/sessions"
+    depends_on:
+      - db
+volumes:
+  api_modules:
