@@ -7,7 +7,6 @@ export default interface User {
   name: string;
   screen_name: string;
   img_url: string;
-  cached_at: string;
 }
 
 export interface CachedUser extends User {
