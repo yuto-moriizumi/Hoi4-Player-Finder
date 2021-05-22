@@ -1,14 +1,14 @@
 version: "3"
 services:
   api:
-    image: node:14.15.4-buster-slim
+    image: node:14
     hostname: api-container
     volumes:
       - ./api/:/usr/src/
       - api_modules:/usr/src/node_modules #node_modulesはコンテナ内部で用意します
     working_dir: "/usr/src"
     ports:
-      - "3000:3000"
+      - "80:3000"
     environment:
       RDS_HOSTNAME: $RDS_HOSTNAME
       RDS_USERNAME: $RDS_USERNAME

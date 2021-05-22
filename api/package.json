@@ -23,6 +23,7 @@
     "http-errors": "~1.6.3",
     "morgan": "~1.9.1",
     "mysql2": "^2.2.5",
+    "qs": "^6.10.1",
     "serverless-http": "^2.7.0",
     "ts-node": "^9.1.1",
     "twitter": "^1.7.1",

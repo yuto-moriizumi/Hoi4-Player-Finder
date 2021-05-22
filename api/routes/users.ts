@@ -2,6 +2,7 @@ import express from 'express';
 import mysql2 from 'mysql2/promise';
 import dayjs from 'dayjs';
 import Twitter from 'twitter';
+import qs from 'qs';
 import User, { CachedUser, TwitterResponseUser } from '../User';
 
 const router = express.Router();
@@ -9,7 +10,7 @@ const router = express.Router();
 const CACHE_TIMEOUT_HOUR = 24; // 名前や表示IDのキャッシュ時間
 
 const DB_SETTING = {
-  uri: process.env.RDS_HOSTNAME ?? 'RDS_HOSTNAME',
+  host: process.env.RDS_HOSTNAME ?? 'RDS_HOSTNAME',
   user: process.env.RDS_USERNAME ?? 'RDS_USERNAME',
   password: process.env.RDS_PASSWORD ?? 'RDS_PASSWORD',
   database: process.env.RDS_DB_NAME ?? 'RDS_DB_NAME',
@@ -137,6 +138,8 @@ async function getUsers(users: CachedUser[]) {
 
 // 登録ユーザ一覧を返す
 router.get('/', async (req, res) => {
+  console.log(DB_SETTING);
+
   const connection = await mysql2.createConnection(DB_SETTING);
   try {
     await connection.connect();
@@ -230,53 +233,73 @@ router.post('/follow', async (req, res) => {
   }
 });
 
-// cron用 ツイートを検索してDBに追加する
+// 公差1の等差数列を返すジェネレータ
+function* gfn(from: number, to: number) {
+  let cur = from;
+  while (cur <= to) {
+    cur += 1;
+    yield cur;
+  }
+}
+
+// cron用 過去7日間のツイートを検索してDBに追加する
 router.get('/update', async (req, res) => {
   try {
-    const API_TYPE = req.query.type; // "30day" or "fullarchive"
-    const IS_PREMIUM_API = API_TYPE === 'fullarchive' || API_TYPE === '30day';
-    console.log('type', API_TYPE);
-    const NEXT = req.query.next; // for pagination, provided by api responce
+    let max_id = req.query.max_id as string | undefined; // for pagination, provided by api responce
+    const IS_RECURSIVE =
+      ((req.query.recursive as string) ?? 'false').toLowerCase() === 'true'; // 再帰的に検索するか
     const client = new Twitter(TWITTER_KEYSET);
 
-    // エンドポイントURLの決定
-    let endpoint = 'search/tweets';
-    if (API_TYPE === 'fullarchive')
-      endpoint = 'tweets/search/fullarchive/test2';
-    if (API_TYPE === '30day') endpoint = 'tweets/search/30day/test';
+    const connection = await mysql2.createConnection(DB_SETTING);
+    await connection.connect();
 
-    let request = {};
-    if (IS_PREMIUM_API) {
-      request = {
-        query: '#hoi4 lang:ja',
-        toDate: 202102200000,
-      };
-      if (NEXT) {
-        Object.defineProperty(request, 'next', {
-          value: NEXT,
-        });
-      }
-    } else {
-      request = {
-        q: '#hoi4 lang:ja',
+    // レスポンスオブジェクト
+    const result = {
+      total: 0,
+      next_max_id: '',
+      success: {
+        total: 0,
+        entries: [] as {}[],
+      },
+      skip: {
+        total: 0,
+        entries: [] as {}[],
+      },
+      error: {
+        total: 0,
+        entries: [] as {}[],
+      },
+    };
+    // eslint-disable-next-line no-restricted-syntax, no-unused-vars
+    for await (const _ of gfn(0, 100)) {
+      console.log(`search from ${max_id}`);
+      const request: {
+        q: string;
+        result_type?: string;
+        count?: number;
+        include_entities?: boolean;
+        max_id?: string;
+      } = {
+        q: '#hoi4 lang:ja exclude:retweets',
         result_type: 'recent',
         count: 100,
         include_entities: false,
+        max_id,
       };
-    }
-    const responce = await client.get(endpoint, request);
-    const { next } = responce;
-    const tweets = (IS_PREMIUM_API ? responce.results : responce.statuses) as {
-      id_str: string;
-      name: string;
-      text: string;
-      user: TwitterResponseUser;
-      created_at: string;
-      retweeted_status?: {};
-    }[];
-    const users = tweets
-      .filter((tweet) => tweet.retweeted_status === undefined) // RTを除外
-      .map((tweet) => ({
+      // 検索
+      const responce = await client.get('search/tweets', request);
+      max_id = (responce.search_metadata.next_results
+        ? qs.parse(responce.search_metadata.next_results)['?max_id']
+        : '') as string;
+      const tweets = responce.statuses as {
+        id_str: string;
+        name: string;
+        text: string;
+        user: TwitterResponseUser;
+        created_at: string;
+        retweeted_status?: {};
+      }[];
+      const users = tweets.map((tweet) => ({
         id: tweet.user.id_str,
         name: tweet.user.name,
         tweet_id: tweet.id_str,
@@ -286,6 +309,112 @@ router.get('/update', async (req, res) => {
         img_url: tweet.user.profile_image_url_https,
       }));
 
+      // DBに登録
+      await Promise.all(
+        users.map(async (user) => {
+          await connection
+            .execute('INSERT users VALUES (?, ?, ?, ?, ?, ?, ?, now())', [
+              user.id,
+              user.tweet_id,
+              user.content,
+              user.created_at,
+              user.name,
+              user.screen_name,
+              user.img_url,
+            ])
+            .then(() => {
+              console.log('success', { user_id: user.id, name: user.name });
+              result.success.entries.push({
+                user_id: user.id,
+                name: user.name,
+              });
+            })
+            .catch((err: { code: string; sqlMessage: string }) => {
+              if (err.code === 'ER_DUP_ENTRY') {
+                console.log(
+                  'skip',
+                  { user_id: user.id, name: user.name },
+                  result.skip.entries.length
+                );
+                result.skip.entries.push({ user_id: user.id, name: user.name });
+                return;
+              }
+              console.log('error', { user_id: user.id, name: user.name });
+              result.error.entries.push({
+                code: err.code,
+                message: err.sqlMessage,
+                user_id: user.id,
+                name: user.name,
+              });
+              console.log(err);
+            });
+        })
+      );
+      result.next_max_id = max_id;
+      if (!IS_RECURSIVE || max_id === '') break; // 再起設定が無効であるか、max_idが取得できなければ離脱
+    }
+    connection.end();
+    // 分かりやすいように各配列の長さをプロパティとして設定しておく
+    result.success.total = result.success.entries.length;
+    result.skip.total = result.skip.entries.length;
+    result.error.total = result.error.entries.length;
+    result.total =
+      result.success.total + result.skip.total + result.error.total;
+    if (result.error.total === 0) {
+      res.send(result);
+      console.log(
+        `user insertion cron success, inserted:${result.success.total} skipped:${result.skip.total}`
+      );
+      return;
+    }
+    res.status(500).send(result);
+    console.log(
+      `user insertion cron partially or fully failed, inserted:${result.success.total} skipped:${result.skip.total}, error:${result.error.total}`
+    );
+  } catch (error) {
+    console.log(error);
+    res.status(500).send();
+  }
+});
+
+router.get('/update/premium', async (req, res) => {
+  try {
+    const API_TYPE = req.query.type; // "30day" or "fullarchive"
+    console.log('type', API_TYPE);
+    const NEXT = req.query.next as string; // for pagination, provided by api responce
+    const client = new Twitter(TWITTER_KEYSET);
+
+    // エンドポイントURLの決定
+    let endpoint = 'search/tweets';
+    if (API_TYPE === 'fullarchive')
+      endpoint = 'tweets/search/fullarchive/test2';
+    if (API_TYPE === '30day') endpoint = 'tweets/search/30day/test';
+
+    const request: { query: string; next?: string } = {
+      query: '#hoi4 lang:ja exclude:retweets',
+    };
+    if (NEXT) request.next = NEXT;
+    console.log(request);
+    const responce = await client.get(endpoint, request);
+    const { next } = responce;
+    const tweets = responce.results as {
+      id_str: string;
+      name: string;
+      text: string;
+      user: TwitterResponseUser;
+      created_at: string;
+      retweeted_status?: {};
+    }[];
+    const users = tweets.map((tweet) => ({
+      id: tweet.user.id_str,
+      name: tweet.user.name,
+      tweet_id: tweet.id_str,
+      content: tweet.text,
+      created_at: dayjs(tweet.created_at).format('YYYY-MM-DD HH:mm:ss'),
+      screen_name: tweet.user.screen_name,
+      img_url: tweet.user.profile_image_url_https,
+    }));
+
     // DBに登録
     const connection = await mysql2.createConnection(DB_SETTING);
     await connection.connect();
@@ -294,7 +423,7 @@ router.get('/update', async (req, res) => {
     const error = [] as {}[];
     users.forEach((user) => {
       connection
-        .execute('INSERT users VALUES (?, ?, ?, ?, ?, ?, ?, now(), 0)', [
+        .execute('INSERT users VALUES (?, ?, ?, ?, ?, ?, ?, now())', [
           user.id,
           user.tweet_id,
           user.content,
