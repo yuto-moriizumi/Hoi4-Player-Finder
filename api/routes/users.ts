@@ -310,50 +310,49 @@ router.get('/update', async (req, res) => {
       }));
 
       // DBに登録
-      await Promise.all(
-        users.map(async (user) => {
-          await connection
-            .execute('INSERT users VALUES (?, ?, ?, ?, ?, ?, ?, now())', [
-              user.id,
-              user.tweet_id,
-              user.content,
-              user.created_at,
-              user.name,
-              user.screen_name,
-              user.img_url,
-            ])
-            .then(() => {
-              console.log('success', { user_id: user.id, name: user.name });
-              result.success.entries.push({
-                user_id: user.id,
-                name: user.name,
-              });
-            })
-            .catch((err: { code: string; sqlMessage: string }) => {
-              if (err.code === 'ER_DUP_ENTRY') {
-                console.log(
-                  'skip',
-                  { user_id: user.id, name: user.name },
-                  result.skip.entries.length
-                );
-                result.skip.entries.push({ user_id: user.id, name: user.name });
-                return;
-              }
-              console.log('error', { user_id: user.id, name: user.name });
-              result.error.entries.push({
-                code: err.code,
-                message: err.sqlMessage,
-                user_id: user.id,
-                name: user.name,
-              });
-              console.log(err);
+      users.forEach((user) => {
+        connection
+          .execute('INSERT users VALUES (?, ?, ?, ?, ?, ?, ?, now())', [
+            user.id,
+            user.tweet_id,
+            user.content,
+            user.created_at,
+            user.name,
+            user.screen_name,
+            user.img_url,
+          ])
+          .then(() => {
+            console.log('success', { user_id: user.id, name: user.name });
+            result.success.entries.push({
+              user_id: user.id,
+              name: user.name,
             });
-        })
-      );
+          })
+          .catch((err: { code: string; sqlMessage: string }) => {
+            if (err.code === 'ER_DUP_ENTRY') {
+              console.log(
+                'skip',
+                { user_id: user.id, name: user.name },
+                result.skip.entries.length
+              );
+              result.skip.entries.push({ user_id: user.id, name: user.name });
+              return;
+            }
+            console.log('error', { user_id: user.id, name: user.name });
+            result.error.entries.push({
+              code: err.code,
+              message: err.sqlMessage,
+              user_id: user.id,
+              name: user.name,
+            });
+            console.log(err);
+          });
+      });
+
       result.next_max_id = max_id;
       if (!IS_RECURSIVE || max_id === '') break; // 再起設定が無効であるか、max_idが取得できなければ離脱
     }
-    connection.end();
+    await connection.end();
     // 分かりやすいように各配列の長さをプロパティとして設定しておく
     result.success.total = result.success.entries.length;
     result.skip.total = result.skip.entries.length;
