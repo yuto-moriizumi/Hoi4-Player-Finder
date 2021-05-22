@@ -156,7 +156,7 @@ router.get('/', async (req, res) => {
   connection.end();
 });
 
-router.post('/follow', async (req, res) => {
+router.get('/follow', async (req, res) => {
   try {
     const connection = await mysql2.createConnection(DB_SETTING);
     // 検索条件に応じてDBを検索
@@ -211,7 +211,7 @@ router.post('/follow', async (req, res) => {
       return;
     }
     // DBに使用状況を登録
-    res.status(201).send();
+    res.status(201).send(`user followed:${user.screen_name}`);
     connection.end();
   } catch (error) {
     if (error instanceof Array) {
@@ -419,8 +419,9 @@ router.get('/update/premium', async (req, res) => {
     for await (const _ of gfn(0, 100)) {
       // 最大100回再帰実行する
       // リクエストオブジェクトの初期化
-      const request: { query: string; next?: string } = {
-        query: '#hoi4 lang:ja',
+      const request: { query: string; toDate?: number; next?: string } = {
+        query: '#hoi4 lang:ja -from:1055413999183966209', // hoi4やりたいbotを除外
+        toDate: 202012250000,
         next,
       };
       console.log(request);
