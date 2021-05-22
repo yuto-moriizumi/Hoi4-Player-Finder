@@ -325,15 +325,17 @@ type Tweet = {
 
 function tweets2users(tweets: Tweet[]) {
   // ツイートの配列からユーザ配列を取り出す
-  return tweets.map((tweet) => ({
-    id: tweet.user.id_str,
-    name: tweet.user.name,
-    tweet_id: tweet.id_str,
-    content: tweet.text,
-    created_at: dayjs(tweet.created_at).format('YYYY-MM-DD HH:mm:ss'),
-    screen_name: tweet.user.screen_name,
-    img_url: tweet.user.profile_image_url_https,
-  }));
+  return tweets
+    .filter((tweet) => tweet.retweeted_status === undefined) // RTを除外
+    .map((tweet) => ({
+      id: tweet.user.id_str,
+      name: tweet.user.name,
+      tweet_id: tweet.id_str,
+      content: tweet.text,
+      created_at: dayjs(tweet.created_at).format('YYYY-MM-DD HH:mm:ss'),
+      screen_name: tweet.user.screen_name,
+      img_url: tweet.user.profile_image_url_https,
+    }));
 }
 
 // cron用 過去7日間のツイートを検索してDBに追加する
@@ -369,14 +371,15 @@ router.get('/update', async (req, res) => {
       };
       // 検索
       const responce = await client.get('search/tweets', request);
-      max_id = (responce.search_metadata.next_results
-        ? qs.parse(responce.search_metadata.next_results)['?max_id']
-        : '') as string;
       const users = tweets2users(responce.statuses as Tweet[]);
       registerUsers(connection, users, result); // DBにユーザを登録する
-      result.next = max_id;
-      if (!IS_RECURSIVE || max_id === '') break; // 再起設定が無効であるか、max_idが取得できなければ離脱
+      max_id = (responce.search_metadata.next_results
+        ? qs.parse(responce.search_metadata.next_results)['?max_id']
+        : undefined) as string | undefined;
+      result.next = max_id ?? '';
+      if (!IS_RECURSIVE || max_id === undefined) break; // 再起設定が無効であるか、max_idが取得できなければ離脱
     }
+    await connection.commit();
     await connection.end();
     // 分かりやすいように各配列の長さをプロパティとして設定しておく
     result.updateTotal();
@@ -398,42 +401,43 @@ router.get('/update', async (req, res) => {
 });
 
 router.get('/update/premium', async (req, res) => {
+  const result = new Result();
   try {
     // パラメータ取得
     const API_TYPE = req.query.type; // "30day" or "fullarchive"
     const IS_RECURSIVE =
       ((req.query.recursive as string) ?? 'false').toLowerCase() === 'true'; // 再帰的に検索するか
-    const NEXT = req.query.next as string; // for pagination, provided by api responce
+    let next = req.query.next as string | undefined; // for pagination, provided by api responce
     console.log('type', API_TYPE);
 
-    // Twitterクライアント,DB接続,結果オブジェクトの初期化
+    // Twitterクライアント,DB接続の初期化
     const client = new Twitter(TWITTER_KEYSET);
-    const result = new Result();
     const connection = await mysql2.createConnection(DB_SETTING);
     await connection.connect();
-
-    // リクエストオブジェクトの初期化
-    const request: { query: string; next?: string } = {
-      query: '#hoi4 lang:ja exclude:retweets',
-    };
-    if (NEXT) request.next = NEXT;
-    console.log(request);
 
     // eslint-disable-next-line no-restricted-syntax, no-unused-vars
     for await (const _ of gfn(0, 100)) {
       // 最大100回再帰実行する
+      // リクエストオブジェクトの初期化
+      const request: { query: string; next?: string } = {
+        query: '#hoi4 lang:ja',
+        next,
+      };
+      console.log(request);
+
       const responce = await client.get(
         API_TYPE === 'fullarchive'
           ? 'tweets/search/fullarchive/test2'
           : 'tweets/search/30day/test',
         request
       );
-      const { next } = responce;
       const users = tweets2users(responce.results as Tweet[]);
       registerUsers(connection, users, result); // DBにユーザを登録する
-      result.next = next;
-      if (!IS_RECURSIVE || next === '') break; // 再起設定が無効であるか、max_idが取得できなければ離脱
+      next = responce.next;
+      result.next = next ?? '';
+      if (!IS_RECURSIVE || next === undefined) break; // 再起設定が無効であるか、nextが取得できなければ離脱
     }
+    await connection.commit();
     await connection.end();
     // 分かりやすいように各配列の長さをプロパティとして設定しておく
     result.updateTotal();
@@ -450,7 +454,7 @@ router.get('/update/premium', async (req, res) => {
     );
   } catch (error) {
     console.log(error);
-    res.status(500).send();
+    res.status(500).send(result);
   }
 });
 
