@@ -31,11 +31,13 @@ const ACCESS_TOKEN = {
 };
 const SCREEN_NAME = process.env.TWITTER_SCREEN_NAME ?? 'TWITTER_SCREEN_NAME';
 
-// ユーザのキャッシュが有効か判定する
-function isUserCacheTimeout(user: CachedUser) {
-  return dayjs(user.cached_at)
-    .add(CACHE_TIMEOUT_HOUR, 'hours')
-    .isBefore(dayjs());
+/**
+ * ユーザのキャッシュが期限切れかどうか判定する
+ * 取得日時から24時間以上経過していれば、期限切れとする
+ * @param {CachedUser} user
+ */
+export function isUserCacheTimeout(user: CachedUser) {
+  return dayjs(user.cached_at).add(CACHE_TIMEOUT_HOUR, 'hours') <= dayjs();
 }
 
 // 引数に与えられたユーザの最新情報をTwitterから取得する

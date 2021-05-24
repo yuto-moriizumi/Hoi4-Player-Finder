@@ -6,6 +6,7 @@ import logger from 'morgan';
 import compression from 'compression';
 
 import usersRouter from './routes/users';
+import test_handler from './test_handler';
 // envファイルの読み込み
 dotenv.config();
 
@@ -24,6 +25,8 @@ app.use('/users', usersRouter);
 app.get('/', (req, res) => {
   res.status(200).send('Welcome to Hoi4 Player Finder');
 });
+
+app.get('/test', test_handler);
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => next(createError(404)));
