@@ -34,15 +34,24 @@ const SCREEN_NAME = process.env.TWITTER_SCREEN_NAME ?? 'TWITTER_SCREEN_NAME';
 /**
  * ユーザのキャッシュが期限切れかどうか判定する
  * 取得日時から24時間以上経過していれば、期限切れとする
- * @param {CachedUser} user
+ * @param {CachedUser} user キャッシュ日時情報付きのユーザ
  */
 export function isUserCacheTimeout(user: CachedUser) {
   return dayjs(user.cached_at).add(CACHE_TIMEOUT_HOUR, 'hours') <= dayjs();
 }
 
-// 引数に与えられたユーザの最新情報をTwitterから取得する
-async function fetchUsers(users: User[]) {
-  if (users.length === 0 || users.length > 100)
+interface ArgumentError extends Error {}
+
+/**
+ * 最新のユーザ情報をTwitterから取得して返す
+ * @param {User[]} users ユーザの配列 長さ100を超えてはいけません
+ * @returns {(Promise<User[] |  ArgumentError | Error>)} 更新されたユーザの配列 または  ArgumentError または Error
+ */
+async function fetchUsers(
+  users: User[]
+): Promise<User[] | ArgumentError | Error> {
+  if (users.length === 0) return [];
+  if (users.length > 100)
     return new TypeError('users length must be between 1 and 100');
   const client = new Twitter(TWITTER_KEYSET);
   try {
