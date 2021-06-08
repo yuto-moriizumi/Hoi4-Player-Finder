@@ -93,7 +93,7 @@ export async function fetchUsers(
 }
 
 // キャッシュしたユーザの配列から、必要に応じて最新データに更新したユーザ一覧を返却する
-async function getUsers(users: CachedUser[]) {
+export async function getUsers(users: CachedUser[]) {
   if (users.length === 0) return new TypeError('Users array cannot be empty');
   if (
     // どのユーザも期限切れでなければそのまま返す
@@ -104,8 +104,8 @@ async function getUsers(users: CachedUser[]) {
   }
 
   // 返却順を保証するために、何番目がキャッシュを利用するユーザであるか保存しておく
-  const cached_users: User[] = [];
-  const old_users: User[] = [];
+  const cached_users: CachedUser[] = [];
+  const old_users: CachedUser[] = [];
   const user_indexes: ('cache' | 'old')[] = [];
   users.forEach((user) => {
     if (isUserCacheTimeout(user)) {
@@ -126,20 +126,23 @@ async function getUsers(users: CachedUser[]) {
   // データベース上のキャッシュを更新する
   const connection = await mysql2.createConnection(DB_SETTING);
   await connection.connect();
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  console.log('now', now);
+
   latest_users.forEach((user) =>
     connection.execute(
-      `UPDATE users SET name=?, screen_name=?, img_url=?, cached_at=now() WHERE id=?`,
-      [user.name, user.screen_name, user.img_url, user.id]
+      `UPDATE users SET name=?, screen_name=?, img_url=?, cached_at=? WHERE id=?`,
+      [user.name, user.screen_name, user.img_url, now, user.id]
     )
   );
   connection.end();
 
   // 更新したユーザとキャッシュしたユーザの配列を結合して返す
-  const res_users: User[] = [];
+  const res_users: CachedUser[] = [];
   for (let i = 0; i < user_indexes.length; i += 1) {
     if (user_indexes[i] === 'old') {
       const user = latest_users.shift();
-      if (user) res_users.push(user);
+      if (user) res_users.push({ ...user, cached_at: now });
     } else {
       const user = cached_users.shift();
       if (user) res_users.push(user);
