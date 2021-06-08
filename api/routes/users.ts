@@ -47,7 +47,7 @@ interface ArgumentError extends Error {}
  * @param {User[]} users ユーザの配列 長さ100を超えてはいけません
  * @returns {(Promise<User[] |  ArgumentError | Error>)} 更新されたユーザの配列 または  ArgumentError または Error
  */
-async function fetchUsers(
+export async function fetchUsers(
   users: User[]
 ): Promise<User[] | ArgumentError | Error> {
   if (users.length === 0) return [];
@@ -55,31 +55,32 @@ async function fetchUsers(
     return new TypeError('users length must be between 1 and 100');
   const client = new Twitter(TWITTER_KEYSET);
   try {
-    const ids = users.map((user) => user.id).join(',');
-    console.log(ids);
+    // const ids = users.map((user) => user.id).join(',');
+    // console.log(ids);
 
-    const detailed_users = await client.get('users/lookup', {
+    const detailed_users = (await client.get('users/lookup', {
       user_id: users.map((user) => user.id).join(','),
       include_entities: false,
-    });
+    })) as TwitterResponseUser[];
     if (!detailed_users) return new Error("couldn't fetch users");
-    console.log('FETCHED USERS');
+
     // users配列をidで取れるようにMapに変換
     const users_map = new Map<string, User>(
       users.map((user) => [user.id, user])
     );
     const responce_users = detailed_users.map((user: TwitterResponseUser) => {
-      const tweet_user = users_map.get(user.id_str);
-      const detailed_user = {
+      const tweet_user = users_map.get(user.id_str) as User;
+      const detailed_user: User = {
         id: user.id_str,
+        tweet_id: tweet_user?.tweet_id,
         name: user.name,
         screen_name: user.screen_name,
         img_url: user.profile_image_url_https,
         content: tweet_user?.content,
         created_at: tweet_user?.created_at,
-      } as User;
+      };
       return detailed_user;
-    }) as User[];
+    });
     return responce_users;
   } catch (error) {
     if (error instanceof Array && error[0].code === 17) {
@@ -103,9 +104,9 @@ async function getUsers(users: CachedUser[]) {
   }
 
   // 返却順を保証するために、何番目がキャッシュを利用するユーザであるか保存しておく
-  const cached_users = [] as User[];
-  const old_users = [] as User[];
-  const user_indexes = [] as ('cache' | 'old')[];
+  const cached_users: User[] = [];
+  const old_users: User[] = [];
+  const user_indexes: ('cache' | 'old')[] = [];
   users.forEach((user) => {
     if (isUserCacheTimeout(user)) {
       old_users.push(user);
@@ -134,7 +135,7 @@ async function getUsers(users: CachedUser[]) {
   connection.end();
 
   // 更新したユーザとキャッシュしたユーザの配列を結合して返す
-  const res_users = [] as User[];
+  const res_users: User[] = [];
   for (let i = 0; i < user_indexes.length; i += 1) {
     if (user_indexes[i] === 'old') {
       const user = latest_users.shift();
