@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import Twitter from 'twitter';
 import qs from 'qs';
 import User, { CachedUser, TwitterResponseUser } from './User';
+import Database from './Database';
 
 const router = express.Router();
 
@@ -99,7 +100,7 @@ export async function getUsers(users: CachedUser[]) {
     // どのユーザも期限切れでなければそのまま返す
     !users.some((user) => isUserCacheTimeout(user))
   ) {
-    console.log('use cache');
+    // console.log('use cache');
     return users;
   }
 
@@ -124,18 +125,20 @@ export async function getUsers(users: CachedUser[]) {
   }
 
   // データベース上のキャッシュを更新する
-  const connection = await mysql2.createConnection(DB_SETTING);
-  await connection.connect();
+  const db = new Database(DB_SETTING);
+  // const connection = await mysql2.createConnection(DB_SETTING);
+  // await connection.connect();
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss');
-  console.log('now', now);
 
-  latest_users.forEach((user) =>
-    connection.execute(
-      `UPDATE users SET name=?, screen_name=?, img_url=?, cached_at=? WHERE id=?`,
-      [user.name, user.screen_name, user.img_url, now, user.id]
-    )
-  );
-  connection.end();
+  await db.updateUsers(latest_users, now);
+
+  // latest_users.forEach((user) =>
+  //   connection.execute(
+  //     `UPDATE users SET name=?, screen_name=?, img_url=?, cached_at=? WHERE id=?`,
+  //     [user.name, user.screen_name, user.img_url, now, user.id]
+  //   )
+  // );
+  // connection.end();
 
   // 更新したユーザとキャッシュしたユーザの配列を結合して返す
   const res_users: CachedUser[] = [];

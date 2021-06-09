@@ -2,11 +2,13 @@ import dayjs from 'dayjs';
 import Twitter from 'twitter';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import MockDate from 'mockdate';
-import { fetchUsers, isUserCacheTimeout } from '../src/users';
+import { fetchUsers, getUsers, isUserCacheTimeout } from '../src/users';
 import { CachedUser } from '../src/User';
+import Database from '../src/Database';
 
 // テスト用に、今日の日付を2020/1/1 0:00:00とする
 const date2mock = '2020/01/01';
+const formatStr = 'YYYY-MM-DD HH:mm:ss';
 beforeEach(() => {
   MockDate.set(date2mock);
 });
@@ -39,7 +41,7 @@ const old_tweets = [
     name: 'Taro Tanaka',
     screen_name: 'TaroTanaka',
     content,
-    created_at: today.format('YYYY-MM-DD'),
+    created_at: today.format(formatStr),
     img_url:
       'https://pbs.twimg.com/profile_images/1402039511475843073/IRl5VXHD_400x400.jpg',
   },
@@ -52,7 +54,7 @@ const updated_tweets = [
     name: 'Ziro Tanaka',
     screen_name: 'ZiroTanaka',
     content,
-    created_at: today.format('YYYY-MM-DD'),
+    created_at: today.format(formatStr),
     img_url: updated_image_url,
   },
 ];
@@ -77,29 +79,36 @@ test('User information must be updated on fetchUsers', async () => {
   expect(await fetchUsers(old_tweets)).toEqual(updated_tweets);
 });
 
-// test('Old user information must not be updated on getUsers', async () => {
-//   const far_past_date = today.add(-48, 'hours').format('YYYY-MM-DD');
-//   const old_tweets2 = old_tweets.map((tweet) => {
-//     const tweet2: CachedUser = { ...tweet, cached_at: far_past_date };
-//     return tweet2;
-//   });
-//   const updated_tweets2 = updated_tweets.map((tweet) => {
-//     const tweet2: CachedUser = {
-//       ...tweet,
-//       cached_at: today.format('YYYY-MM-DD'),
-//     };
-//     return tweet2;
-//   });
-//   expect(await getUsers(old_tweets2)).toEqual(updated_tweets2);
-// });
+// データベースラッパをモック化しておく
+jest.mock('../src/Database');
+const DatabaseMock = Database as jest.Mock;
+DatabaseMock.mockImplementation(() => ({
+  updateUsers: async () => {},
+}));
 
-// test('Latest user information must not be updated on getUsers', async () => {
-//   const old_tweets2: CachedUser[] = old_tweets.map((tweet) => {
-//     const tweet2: CachedUser = {
-//       ...tweet,
-//       cached_at: today.format('YYYY-MM-DD'),
-//     };
-//     return tweet2;
-//   });
-//   expect(await getUsers(old_tweets2)).toEqual(old_tweets2);
-// });
+test('Old user information must not be updated on getUsers', async () => {
+  const far_past_date = today.add(-48, 'hours').format(formatStr);
+  const old_tweets2 = old_tweets.map((tweet) => {
+    const tweet2: CachedUser = { ...tweet, cached_at: far_past_date };
+    return tweet2;
+  });
+  const updated_tweets2 = updated_tweets.map((tweet) => {
+    const tweet2: CachedUser = {
+      ...tweet,
+      cached_at: today.format(formatStr),
+    };
+    return tweet2;
+  });
+  expect(await getUsers(old_tweets2)).toEqual(updated_tweets2);
+});
+
+test('Latest user information must not be updated on getUsers', async () => {
+  const old_tweets2: CachedUser[] = old_tweets.map((tweet) => {
+    const tweet2: CachedUser = {
+      ...tweet,
+      cached_at: today.format(formatStr),
+    };
+    return tweet2;
+  });
+  expect(await getUsers(old_tweets2)).toEqual(old_tweets2);
+});
