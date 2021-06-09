@@ -2,8 +2,8 @@ import dayjs from 'dayjs';
 import Twitter from 'twitter';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import MockDate from 'mockdate';
-import { fetchUsers, isUserCacheTimeout } from '../routes/users';
-import { CachedUser } from '../User';
+import { fetchUsers, isUserCacheTimeout } from '../src/users';
+import { CachedUser } from '../src/User';
 
 // テスト用に、今日の日付を2020/1/1 0:00:00とする
 const date2mock = '2020/01/01';

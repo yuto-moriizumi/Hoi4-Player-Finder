@@ -5,7 +5,7 @@ import Express from 'express';
 import logger from 'morgan';
 import compression from 'compression';
 
-import usersRouter from './routes/users';
+import usersRouter from './users';
 import test_handler from './test_handler';
 // envファイルの読み込み
 dotenv.config();

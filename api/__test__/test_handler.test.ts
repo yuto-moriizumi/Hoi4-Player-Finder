@@ -1,5 +1,5 @@
 import express from 'express';
-import test_handler from '../test_handler';
+import test_handler from '../src/test_handler';
 
 test('status 200 with id', () => {
   const req = {

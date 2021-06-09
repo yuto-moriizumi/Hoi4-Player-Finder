@@ -3,7 +3,7 @@ import mysql2 from 'mysql2/promise';
 import dayjs from 'dayjs';
 import Twitter from 'twitter';
 import qs from 'qs';
-import User, { CachedUser, TwitterResponseUser } from '../User';
+import User, { CachedUser, TwitterResponseUser } from './User';
 
 const router = express.Router();
 
