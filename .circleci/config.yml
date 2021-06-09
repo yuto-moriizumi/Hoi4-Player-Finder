@@ -30,6 +30,7 @@ jobs:
           pkg-manager: yarn
           # working_directory: ~/api
           app-dir: ~/api
+          command: ls
       - run:
           name: Run tests
           command: npm test
