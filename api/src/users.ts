@@ -341,7 +341,7 @@ type Tweet = {
   retweeted_status?: {} | undefined;
 };
 
-function tweets2users(tweets: Tweet[]) {
+function tweets2users(tweets: Tweet[]): User[] {
   // ツイートの配列からユーザ配列を取り出す
   return tweets
     .filter((tweet) => tweet.retweeted_status === undefined) // RTを除外
