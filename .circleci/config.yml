@@ -33,6 +33,7 @@ jobs:
           # working_directory: ~/api
           app-dir: api
       - run:
+          working_directory: api
           name: Run tests
           command: npm test
 
