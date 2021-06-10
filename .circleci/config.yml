@@ -35,7 +35,8 @@ jobs:
           command: npm test
       - persist_to_workspace:
           root: .
-          path: .
+          paths:
+            - .
   deploy:
     docker:
       - image: cimg/node:15.1
