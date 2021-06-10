@@ -34,6 +34,8 @@ jobs:
           name: Run tests
           command: npm test
   deploy:
+    docker:
+      - image: cimg/node:15.1
     steps:
       - checkout
       - aws-cli/install
