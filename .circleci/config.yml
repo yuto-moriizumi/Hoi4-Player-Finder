@@ -46,14 +46,15 @@ commands:
     steps:
       - run:
           name: deploy
+          # command: |
+          #   set -x
+          #   aws --version
+          #   echo "any deploy command"
+          #   aws s3 ls
           command: |
             set -x
-
-            aws --version
-
-            echo "any deploy command"
-
-            aws s3 ls
+            npm i -D serverless
+            sls deploy
 
 workflows:
   # Below is the definition of your workflow.
