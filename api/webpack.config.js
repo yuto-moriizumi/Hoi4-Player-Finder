@@ -9,7 +9,7 @@ module.exports = {
   target: "node",
 
   // メインとなるJavaScriptファイル（エントリーポイント）
-  entry: "src/handler.ts",
+  entry: "./handler.ts",
 
   module: {
     rules: [

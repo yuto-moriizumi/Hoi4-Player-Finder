@@ -1,5 +1,5 @@
 import serverless from 'serverless-http';
-import app from './app';
+import app from './src/app';
 
 // デフォルトexportだと、handlerを見つけられなくなる
 // eslint-disable-next-line import/prefer-default-export

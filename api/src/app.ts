@@ -23,7 +23,7 @@ app.use('/users', usersRouter);
 
 // ダミー
 app.get('/', (req, res) => {
-  res.status(200).send('Welcome to Hoi4 Player Finder');
+  res.status(200).send('Welcome to Hoi4 Player Finder!');
 });
 
 app.get('/test', test_handler);
