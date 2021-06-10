@@ -54,7 +54,7 @@ commands:
           command: |
             set -x
             sudo npm i -g serverless
-            sls config credentials -k ${AWS_ACCESS_KEY} -s ${AWS_SECRET_KEY} -p aws
+            sls config credentials -k ${AWS_ACCESS_KEY_ID} -s ${AWS_SECRET_ACCESS_KEY} -p aws
             sls deploy
 
 workflows:
