@@ -33,12 +33,16 @@ jobs:
           working_directory: api
           name: Run tests
           command: npm test
+      - persist_to_workspace:
+          root: ~/dir
   deploy:
     docker:
       - image: cimg/node:15.1
     steps:
       - checkout
       - aws-cli/install
+      - attach_workspace:
+          at: ~/dir
       - deploy
 
 commands:
