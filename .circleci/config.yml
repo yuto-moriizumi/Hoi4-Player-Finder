@@ -34,7 +34,7 @@ jobs:
           name: Run tests
           command: npm test
       - persist_to_workspace:
-          root: ~/dir
+          root: ~/project/api
           path: node_modules
   deploy:
     docker:
@@ -43,7 +43,7 @@ jobs:
       - checkout
       - aws-cli/install
       - attach_workspace:
-          at: ~/dir
+          at: ~/project/api
       - deploy
 
 commands:
