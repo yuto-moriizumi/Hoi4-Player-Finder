@@ -53,7 +53,7 @@ commands:
           #   aws s3 ls
           command: |
             set -x
-            npm i -g serverless
+            sudo npm i -g serverless
             sls config credentials -k ${AWS_ACCESS_KEY} -s ${AWS_SECRET_KEY} -p aws
             sls deploy
 
