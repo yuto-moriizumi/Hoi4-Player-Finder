@@ -456,8 +456,8 @@ router.get('/update/premium', async (req, res) => {
       // 最大100回再帰実行する
       // リクエストオブジェクトの初期化
       const request: { query: string; toDate?: number; next?: string } = {
-        query: '#hoi4 lang:ja -from:1055413999183966209', // hoi4やりたいbotを除外
-        toDate: 202012250000,
+        query: 'hoi4 lang:ja -from:1055413999183966209', // hoi4やりたいbotを除外
+        toDate: 202106070000,
         next,
       };
       console.log(request);
