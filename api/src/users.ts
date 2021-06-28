@@ -9,6 +9,7 @@ import Database from './Database';
 const router = express.Router();
 
 const CACHE_TIMEOUT_HOUR = 24; // 名前や表示IDのキャッシュ時間
+const INOGRE_LIST_ID = '1409376553578885126';
 
 const DB_SETTING = {
   host: process.env.RDS_HOSTNAME ?? 'RDS_HOSTNAME',
@@ -207,7 +208,24 @@ router.get('/follow', async (req, res) => {
     const following_ids = followings.ids as Array<string>;
     // フォローしているユーザを除外する
     users = users.filter((user) => following_ids.indexOf(user.id) === -1);
+
+    // 除外リストのユーザID一覧を取得
+    const ignores = await client.get('lists/members', {
+      list_id: INOGRE_LIST_ID,
+    });
+    const ignore_ids = ignores as { users: TwitterResponseUser[] };
+    // 除外リストのユーザを除外する
+    users = users.filter(
+      (user) =>
+        ignore_ids.users.map((user2) => user2.id_str).indexOf(user.id) === -1
+    );
+
     // フォローするユーザを決定する
+    if (users.length === 0) {
+      // フォローすべきユーザが1人も居なければなにもしない
+      res.status(204).send('There is no user whom you can follow');
+      return;
+    }
     const user = users[Math.floor(Math.random() * users.length)];
 
     const result = await client.post('friendships/create', {
