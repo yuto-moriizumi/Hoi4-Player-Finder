@@ -399,7 +399,7 @@ router.get('/update', async (req, res) => {
         include_entities?: boolean;
         max_id?: string;
       } = {
-        q: '#hoi4 lang:ja exclude:retweets',
+        q: 'hoi4 lang:ja exclude:retweets',
         result_type: 'recent',
         count: 100,
         include_entities: false,
