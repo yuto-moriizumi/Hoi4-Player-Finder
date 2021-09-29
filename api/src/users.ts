@@ -84,7 +84,7 @@ export async function fetchUsers(
       return detailed_user;
     });
     return responce_users;
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof Array && error[0].code === 17) {
       return [];
     }
@@ -176,6 +176,7 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/follow', async (req, res) => {
+  // ランダムな未フォローユーザーをフォローする
   try {
     const connection = await mysql2.createConnection(DB_SETTING);
     // 検索条件に応じてDBを検索
@@ -235,15 +236,19 @@ router.get('/follow', async (req, res) => {
       // エラーオブジェクトの配列が返された場合
       const error = result[0] as { code: number; message: string };
       if (error.code === 88) {
-        res.status(429).send(error); // APIレート制限
+        res.status(429).send({ error: [error] }); // APIレート制限
+        return;
+      }
+      if (error.code === 162) {
+        res.status(403).send({ error: [error] }); // 対象のユーザにブロックされている
         return;
       }
       if (error.code === 326) {
-        res.status(423).send(error); // アカウントがロックされている
+        res.status(423).send({ error: [error] }); // アカウントがロックされている
         return;
       }
       console.warn('other error occured');
-      res.status(500).send(error); // その他のエラー
+      res.status(500).send({ error: [error] }); // その他のエラー
       return;
     }
     // DBに使用状況を登録
@@ -432,7 +437,7 @@ router.get('/update', async (req, res) => {
     );
   } catch (error) {
     console.log(error);
-    res.status(500).send();
+    res.status(500).send(error);
   }
 });
 
